@@ -1,0 +1,465 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Confusion Matrix Metrics — TP/TN/FP/FN</title>
+  <style>
+    :root{
+      --bg:#fff; --fg:#0b0b0b; --muted:#555;
+      --line:#dadada; --line2:#bdbdbd;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+      --r:12px;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:var(--sans);color:var(--fg);background:var(--bg);line-height:1.25;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+    .wrap{max-width:1100px;margin:0 auto;padding:18px 14px 24px}
+    header{border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:14px}
+    h1{font-size:clamp(18px,3.6vw,22px);margin:0 0 6px;letter-spacing:.2px}
+    .sub{margin:0;font-size:13px;color:var(--muted)}
+
+    .grid{display:grid;grid-template-columns:360px 1fr;gap:14px;align-items:start}
+    @media (max-width:980px){.grid{grid-template-columns:1fr}}
+
+    .panel{border:1px solid var(--line);border-radius:var(--r);background:#fff;overflow:hidden}
+    .ph{padding:10px 12px;border-bottom:1px solid var(--line);font-weight:700;font-size:13px;display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+    .ph span{font-weight:500;color:var(--muted);font-size:12px;font-family:var(--mono);white-space:nowrap}
+    .pb{padding:12px}
+
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+    @media (max-width:460px){.row{grid-template-columns:1fr}}
+    label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+    input[type="number"]{width:100%;padding:11px 10px;font-size:14px;border-radius:10px;border:1px solid var(--line2);outline:none;background:#fff;color:var(--fg);appearance:textfield}
+    input[type="number"]:focus{border-color:#000}
+
+    .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+    .chip{border:1px solid var(--line);border-radius:999px;padding:6px 10px;font-size:12px;display:inline-flex;gap:8px;align-items:baseline;background:#fff;white-space:nowrap}
+    .chip .mono{font-family:var(--mono)}
+    .chip b{font-family:var(--mono);font-weight:900}
+
+    .charts{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+    @media (max-width:820px){.charts{grid-template-columns:1fr}}
+    .chartBox{border:1px solid var(--line);border-radius:var(--r);padding:10px;background:#fff}
+    .chartLbl{font-size:12px;color:var(--muted);margin:0 0 6px;font-weight:700}
+    canvas{width:100%;height:220px;border:1px solid var(--line);border-radius:10px;display:block;background:#fff}
+    @media (max-width:520px){canvas{height:270px}}
+    .desc{color:var(--muted);font-size:12px;margin-top:6px}
+
+    .metrics{margin-top:12px;display:flex;flex-direction:column;gap:10px}
+    .metricCard{border:1px solid var(--line);border-radius:var(--r);background:#fff;padding:10px}
+    .metricTitle{margin:0 0 8px;font-size:13px;font-weight:900}
+    .abbr{font-family:var(--mono)}
+    .metricText{margin:0 0 8px;font-size:13px}
+    .metricFormula{margin:0 0 8px;font-size:13px;font-family:var(--mono)}
+    .metricValue{margin:0 0 8px;font-size:13px;font-family:var(--mono);font-weight:900}
+    .metricAnalysis{margin:0;font-size:13px}
+    .metricAnalysis .opt{color:var(--muted)}
+    .metricAnalysis b{font-weight:900}
+
+    footer{margin-top:14px;padding-top:10px;border-top:1px solid var(--line);color:var(--muted);font-size:11px}
+    @media print{canvas,.charts{display:none}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Confusion Matrix Metrics</h1>
+      <p class="sub">Enter TP / TN / FP / FN → metrics, formulas, interpretation.</p>
+    </header>
+
+    <div class="grid">
+      <section class="panel">
+        <div class="ph">Inputs <span>counts (≥ 0)</span></div>
+        <div class="pb">
+          <div class="row">
+            <div>
+              <label for="tp">TP (True Positive)</label>
+              <input id="tp" type="number" min="0" step="1" value="50" inputmode="numeric" />
+            </div>
+            <div>
+              <label for="tn">TN (True Negative)</label>
+              <input id="tn" type="number" min="0" step="1" value="90" inputmode="numeric" />
+            </div>
+          </div>
+          <div class="row">
+            <div>
+              <label for="fp">FP (False Positive)</label>
+              <input id="fp" type="number" min="0" step="1" value="10" inputmode="numeric" />
+            </div>
+            <div>
+              <label for="fn">FN (False Negative)</label>
+              <input id="fn" type="number" min="0" step="1" value="20" inputmode="numeric" />
+            </div>
+          </div>
+
+          <div class="chips" aria-label="Derived counts">
+            <span class="chip"><span class="mono">P = TP + FN =</span> <b id="P">—</b></span>
+            <span class="chip"><span class="mono">N = TN + FP =</span> <b id="N">—</b></span>
+            <span class="chip"><span class="mono">PP = TP + FP =</span> <b id="PP">—</b></span>
+            <span class="chip"><span class="mono">PN = TN + FN =</span> <b id="PN">—</b></span>
+            <span class="chip"><span class="mono">Total = P + N =</span> <b id="TOTAL">—</b></span>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="ph">Results <span>complete list</span></div>
+        <div class="pb">
+
+          <div class="charts">
+            <div class="chartBox">
+              <div class="chartLbl">ROC point (FPR, TPR)</div>
+              <canvas id="rocCanvas"></canvas>
+              <div class="desc">Single operating point.</div>
+            </div>
+            <div class="chartBox">
+              <div class="chartLbl">Key metrics (0–1)</div>
+              <canvas id="barCanvas"></canvas>
+              <div class="desc">Values appear to the right (aligned with each bar).</div>
+            </div>
+          </div>
+
+          <div id="metricsList" class="metrics" aria-label="Metrics list"></div>
+
+          <footer>
+            “Positive/Negative” are class labels (1/0). Division-by-zero is shown as N/A.
+          </footer>
+        </div>
+      </section>
+    </div>
+  </div>
+
+<script>
+(function(){
+  const el = (id)=>document.getElementById(id);
+  const inputs = { tp: el('tp'), tn: el('tn'), fp: el('fp'), fn: el('fn') };
+  const rocCanvas = el('rocCanvas');
+  const barCanvas = el('barCanvas');
+
+  function n0(x){ x = Number(x); if(!Number.isFinite(x) || x < 0) return 0; return Math.floor(x); }
+  function safeDiv(a,b){ return (b===0) ? NaN : (a/b); }
+  function fmt6(x){ if(!Number.isFinite(x)) return "N/A"; return x.toFixed(6); }
+  function fmtPct2(x){ if(!Number.isFinite(x)) return "N/A"; return (x*100).toFixed(2) + "%"; }
+  function clamp01(x){ return Math.max(0, Math.min(1, x)); }
+
+  function canvas2d(canvas){
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    const w = Math.max(1, rect.width);
+    const h = Math.max(1, rect.height);
+    canvas.width  = Math.round(w * dpr);
+    canvas.height = Math.round(h * dpr);
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    return {ctx, w, h};
+  }
+
+  function drawRoc(fpr, tpr){
+    const {ctx, w, h} = canvas2d(rocCanvas);
+    ctx.clearRect(0,0,w,h);
+
+    const p = 28;
+    const x0 = p, y0 = h - p, x1 = w - p, y1 = p;
+
+    ctx.strokeStyle = 'rgba(0,0,0,.10)';
+    ctx.lineWidth = 1;
+    for(let i=0;i<=10;i++){
+      const x = x0 + (x1-x0)*i/10;
+      const y = y0 - (y0-y1)*i/10;
+      ctx.beginPath(); ctx.moveTo(x,y0); ctx.lineTo(x,y1); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x0,y); ctx.lineTo(x1,y); ctx.stroke();
+    }
+
+    ctx.strokeStyle = 'rgba(0,0,0,.35)';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1,y0); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x0,y1); ctx.stroke();
+
+    ctx.setLineDash([6,6]);
+    ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1,y1); ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.fillStyle = 'rgba(0,0,0,.70)';
+    ctx.font = '12px ui-monospace, Menlo, Consolas, monospace';
+    ctx.fillText('FPR →', x1 - 48, y0 + 20);
+
+    ctx.save();
+    ctx.translate(14, h/2);
+    ctx.rotate(-Math.PI/2);
+    ctx.fillText('TPR →', 0, 0);
+    ctx.restore();
+
+    if(Number.isFinite(fpr) && Number.isFinite(tpr)){
+      const fx = clamp01(fpr), ty = clamp01(tpr);
+      const px = x0 + (x1-x0)*fx;
+      const py = y0 - (y0-y1)*ty;
+
+      ctx.fillStyle = '#000';
+      ctx.beginPath(); ctx.arc(px,py,4.5,0,Math.PI*2); ctx.fill();
+
+      const label = `(${fmt6(fpr)}, ${fmt6(tpr)})`;
+      ctx.font = '12px ui-monospace, Menlo, Consolas, monospace';
+      const pad = 4;
+      const tw = ctx.measureText(label).width;
+      const lx = Math.min(px + 10, x1 - tw - 2*pad);
+      const ly = Math.max(py - 14, y1 + 8);
+
+      ctx.fillStyle = 'rgba(255,255,255,.92)';
+      ctx.fillRect(lx - pad, ly - 12, tw + 2*pad, 16);
+      ctx.strokeStyle = 'rgba(0,0,0,.12)';
+      ctx.strokeRect(lx - pad, ly - 12, tw + 2*pad, 16);
+
+      ctx.fillStyle = 'rgba(0,0,0,.85)';
+      ctx.fillText(label, lx, ly);
+    } else {
+      ctx.fillStyle = 'rgba(0,0,0,.65)';
+      ctx.font = '12px ui-monospace, Menlo, Consolas, monospace';
+      ctx.fillText('N/A (requires P>0 and N>0)', x0, y1 + 16);
+    }
+  }
+
+  function computeLeftMargin(ctx, labels, font){
+    ctx.font = font;
+    let maxW = 0;
+    for(const s of labels) maxW = Math.max(maxW, ctx.measureText(s).width);
+    // add padding; cap so we still have bar area
+    return Math.min(190, Math.max(98, Math.ceil(maxW + 22)));
+  }
+
+  function drawBars(items){
+    const {ctx, w, h} = canvas2d(barCanvas);
+    ctx.clearRect(0,0,w,h);
+
+    const top = 14, bottom = 14;
+
+    const labelFont = (w < 380) ? '12px ui-sans-serif, system-ui' : '12px ui-sans-serif, system-ui';
+    const labels = items.map(x=>x.label);
+    const left = computeLeftMargin(ctx, labels, labelFont);
+
+    const valueGutter = Math.min(120, Math.max(74, Math.round(w*0.22)));
+    const rightPad = 10;
+    const barW = Math.max(1, w - left - valueGutter - rightPad);
+    const rowH = (h - top - bottom) / items.length;
+
+    ctx.strokeStyle = 'rgba(0,0,0,.10)';
+    ctx.lineWidth = 1;
+    for(let i=0;i<=10;i++){
+      const x = left + barW*i/10;
+      ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, h-bottom); ctx.stroke();
+    }
+
+    for(let i=0;i<items.length;i++){
+      const yMid = top + i*rowH + rowH*0.5;
+      const yBarTop = yMid - 8;
+
+      // label
+      ctx.fillStyle = 'rgba(0,0,0,.80)';
+      ctx.font = labelFont;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(items[i].label, 10, yMid);
+
+      // bar background
+      ctx.fillStyle = 'rgba(0,0,0,.06)';
+      ctx.fillRect(left, yBarTop, barW, 16);
+
+      const v = items[i].value;
+      const valueText = Number.isFinite(v) ? fmt6(clamp01(v)) : "N/A";
+
+      // bar
+      if(Number.isFinite(v)){
+        const vv = clamp01(v);
+        ctx.fillStyle = 'rgba(0,0,0,.72)';
+        ctx.fillRect(left, yBarTop, barW*vv, 16);
+      }
+
+      // value text (right gutter). White halo keeps it readable over grid.
+      ctx.font = '12px ui-monospace, Menlo, Consolas, monospace';
+      const vx = left + barW + valueGutter - 8;
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'middle';
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = 'rgba(255,255,255,.95)';
+      ctx.strokeText(valueText, vx, yMid);
+      ctx.fillStyle = 'rgba(0,0,0,.88)';
+      ctx.fillText(valueText, vx, yMid);
+    }
+
+    ctx.textAlign = 'start';
+    ctx.textBaseline = 'alphabetic';
+  }
+
+  // Concise bucket helpers: show all options, bold match.
+  function bucket01Higher(x){
+    if(!Number.isFinite(x)) return "<span class='opt'>N/A</span>";
+    const b=[
+      {t:"<0.50", ok:x<0.50},
+      {t:"0.50–0.64", ok:x>=0.50 && x<0.65},
+      {t:"0.65–0.79", ok:x>=0.65 && x<0.80},
+      {t:"0.80–0.89", ok:x>=0.80 && x<0.90},
+      {t:"≥0.90", ok:x>=0.90},
+    ];
+    return "Higher better: " + b.map(o=>o.ok?`<b>${o.t}</b>`:`<span class='opt'>${o.t}</span>`).join(" · ");
+  }
+  function bucket01Lower(x){
+    if(!Number.isFinite(x)) return "<span class='opt'>N/A</span>";
+    const b=[
+      {t:"≤0.05", ok:x<=0.05},
+      {t:"0.06–0.10", ok:x>0.05 && x<=0.10},
+      {t:"0.11–0.20", ok:x>0.10 && x<=0.20},
+      {t:"0.21–0.35", ok:x>0.20 && x<=0.35},
+      {t:">0.35", ok:x>0.35},
+    ];
+    return "Lower better: " + b.map(o=>o.ok?`<b>${o.t}</b>`:`<span class='opt'>${o.t}</span>`).join(" · ");
+  }
+  function bucketSigned(x){
+    if(!Number.isFinite(x)) return "<span class='opt'>N/A</span>";
+    const b=[
+      {t:"<0", ok:x<0},
+      {t:"0–0.19", ok:x>=0 && x<0.20},
+      {t:"0.20–0.49", ok:x>=0.20 && x<0.50},
+      {t:"0.50–0.79", ok:x>=0.50 && x<0.80},
+      {t:"≥0.80", ok:x>=0.80},
+    ];
+    return "Higher better: " + b.map(o=>o.ok?`<b>${o.t}</b>`:`<span class='opt'>${o.t}</span>`).join(" · ");
+  }
+  function bucketLRp(x){
+    if(!Number.isFinite(x)) return "<span class='opt'>N/A</span>";
+    const b=[
+      {t:"<1", ok:x<1},
+      {t:"1–1.9", ok:x>=1 && x<2},
+      {t:"2–4.9", ok:x>=2 && x<5},
+      {t:"5–9.9", ok:x>=5 && x<10},
+      {t:"≥10", ok:x>=10},
+    ];
+    return "Higher better: " + b.map(o=>o.ok?`<b>${o.t}</b>`:`<span class='opt'>${o.t}</span>`).join(" · ");
+  }
+  function bucketLRm(x){
+    if(!Number.isFinite(x)) return "<span class='opt'>N/A</span>";
+    const b=[
+      {t:"≤0.10", ok:x<=0.10},
+      {t:"0.11–0.20", ok:x>0.10 && x<=0.20},
+      {t:"0.21–0.50", ok:x>0.20 && x<=0.50},
+      {t:"0.51–0.99", ok:x>0.50 && x<1.0},
+      {t:"≥1", ok:x>=1.0},
+    ];
+    return "Lower better: " + b.map(o=>o.ok?`<b>${o.t}</b>`:`<span class='opt'>${o.t}</span>`).join(" · ");
+  }
+  function bucketDOR(x){
+    if(!Number.isFinite(x)) return "<span class='opt'>N/A</span>";
+    const b=[
+      {t:"<1", ok:x<1},
+      {t:"1–9.9", ok:x>=1 && x<10},
+      {t:"10–24.9", ok:x>=10 && x<25},
+      {t:"25–99.9", ok:x>=25 && x<100},
+      {t:"≥100", ok:x>=100},
+    ];
+    return "Higher better: " + b.map(o=>o.ok?`<b>${o.t}</b>`:`<span class='opt'>${o.t}</span>`).join(" · ");
+  }
+
+  function metricCard(m){
+    return `
+      <div class="metricCard">
+        <p class="metricTitle">${m.name}</p>
+        <p class="metricText">${m.meaning}</p>
+        <p class="metricFormula">${m.formula}</p>
+        <p class="metricValue">${m.value}</p>
+        <p class="metricAnalysis">${m.analysis}</p>
+      </div>
+    `;
+  }
+
+  let resizeRAF = 0;
+  function compute(){
+    const TP=n0(inputs.tp.value), TN=n0(inputs.tn.value), FP=n0(inputs.fp.value), FN=n0(inputs.fn.value);
+
+    const P=TP+FN, N=TN+FP, PP=TP+FP, PN=TN+FN, TOTAL=P+N;
+    el('P').textContent=P; el('N').textContent=N; el('PP').textContent=PP; el('PN').textContent=PN; el('TOTAL').textContent=TOTAL;
+
+    const TPR=safeDiv(TP,P), FNR=safeDiv(FN,P), TNR=safeDiv(TN,N), FPR=safeDiv(FP,N);
+    const PPV=safeDiv(TP,PP), FDR=safeDiv(FP,PP), NPV=safeDiv(TN,PN), FOR=safeDiv(FN,PN);
+    const prevalence=safeDiv(P,TOTAL);
+    const ACC=safeDiv(TP+TN,TOTAL);
+    const BA=(Number.isFinite(TPR)&&Number.isFinite(TNR)) ? (TPR+TNR)/2 : NaN;
+    const F1=(Number.isFinite(PPV)&&Number.isFinite(TPR)&&(PPV+TPR)!==0) ? (2*PPV*TPR)/(PPV+TPR) : NaN;
+    const FM=(Number.isFinite(PPV)&&Number.isFinite(TPR)) ? Math.sqrt(PPV*TPR) : NaN;
+    const TS=safeDiv(TP,(TP+FN+FP));
+    const BM=(Number.isFinite(TPR)&&Number.isFinite(TNR)) ? (TPR+TNR-1) : NaN;
+    const MK=(Number.isFinite(PPV)&&Number.isFinite(NPV)) ? (PPV+NPV-1) : NaN;
+
+    const LRp=(Number.isFinite(TPR)&&Number.isFinite(FPR)) ? safeDiv(TPR,FPR) : NaN;
+    const LRm=(Number.isFinite(FNR)&&Number.isFinite(TNR)) ? safeDiv(FNR,TNR) : NaN;
+    const DOR=(Number.isFinite(LRp)&&Number.isFinite(LRm)) ? safeDiv(LRp,LRm) : NaN;
+
+    const mcc_den=Math.sqrt((TP+FP)*(TP+FN)*(TN+FP)*(TN+FN));
+    const MCC=(mcc_den===0) ? NaN : ((TP*TN-FP*FN)/mcc_den);
+
+    const PT=(Number.isFinite(TPR)&&Number.isFinite(FPR)&&(TPR-FPR)!==0) ? ((Math.sqrt(TPR*FPR)-FPR)/(TPR-FPR)) : NaN;
+
+    drawRoc(FPR,TPR);
+    drawBars([
+      {label:"Recall (TPR)", value:TPR},
+      {label:"Precision (PPV)", value:PPV},
+      {label:"Specificity (TNR)", value:TNR},
+      {label:"F1", value:F1},
+      {label:"FPR", value:FPR},
+      {label:"FNR", value:FNR},
+    ]);
+
+    const metrics = [
+      { name:"<span class='abbr'>TPR</span> — True Positive Rate (Recall / Sensitivity)", meaning:"Of actual positives, fraction predicted positive.", formula:"TPR = TP / P = 1 − FNR", value:`${fmt6(TPR)} (${fmtPct2(TPR)})`, analysis: bucket01Higher(TPR) },
+      { name:"<span class='abbr'>FNR</span> — False Negative Rate", meaning:"Of actual positives, fraction predicted negative.", formula:"FNR = FN / P = 1 − TPR", value:`${fmt6(FNR)} (${fmtPct2(FNR)})`, analysis: bucket01Lower(FNR) },
+      { name:"<span class='abbr'>TNR</span> — True Negative Rate (Specificity)", meaning:"Of actual negatives, fraction predicted negative.", formula:"TNR = TN / N = 1 − FPR", value:`${fmt6(TNR)} (${fmtPct2(TNR)})`, analysis: bucket01Higher(TNR) },
+      { name:"<span class='abbr'>FPR</span> — False Positive Rate", meaning:"Of actual negatives, fraction predicted positive.", formula:"FPR = FP / N = 1 − TNR", value:`${fmt6(FPR)} (${fmtPct2(FPR)})`, analysis: bucket01Lower(FPR) },
+      { name:"<span class='abbr'>PPV</span> — Positive Predictive Value (Precision)", meaning:"Of predicted positives, fraction truly positive.", formula:"PPV = TP / PP = 1 − FDR", value:`${fmt6(PPV)} (${fmtPct2(PPV)})`, analysis: bucket01Higher(PPV) },
+      { name:"<span class='abbr'>FDR</span> — False Discovery Rate", meaning:"Of predicted positives, fraction truly negative.", formula:"FDR = FP / PP = 1 − PPV", value:`${fmt6(FDR)} (${fmtPct2(FDR)})`, analysis: bucket01Lower(FDR) },
+      { name:"<span class='abbr'>NPV</span> — Negative Predictive Value", meaning:"Of predicted negatives, fraction truly negative.", formula:"NPV = TN / PN = 1 − FOR", value:`${fmt6(NPV)} (${fmtPct2(NPV)})`, analysis: bucket01Higher(NPV) },
+      { name:"<span class='abbr'>FOR</span> — False Omission Rate", meaning:"Of predicted negatives, fraction truly positive.", formula:"FOR = FN / PN = 1 − NPV", value:`${fmt6(FOR)} (${fmtPct2(FOR)})`, analysis: bucket01Lower(FOR) },
+
+      { name:"<span class='abbr'>Prev</span> — Prevalence", meaning:"Positive-class share in the dataset.", formula:"Prevalence = P / (P + N)", value:`${fmt6(prevalence)} (${fmtPct2(prevalence)})`,
+        analysis: Number.isFinite(prevalence) ? "<span class='opt'>Not a quality metric (class balance).</span>" : "<span class='opt'>N/A</span>"
+      },
+
+      { name:"<span class='abbr'>ACC</span> — Accuracy", meaning:"Fraction of all predictions that are correct.", formula:"ACC = (TP + TN) / (P + N)", value:`${fmt6(ACC)} (${fmtPct2(ACC)})`, analysis: bucket01Higher(ACC) },
+      { name:"<span class='abbr'>BA</span> — Balanced Accuracy", meaning:"Average of TPR and TNR.", formula:"BA = (TPR + TNR) / 2", value:`${fmt6(BA)} (${fmtPct2(BA)})`, analysis: bucket01Higher(BA) },
+
+      { name:"<span class='abbr'>F1</span> — F1 score", meaning:"Balance of Precision and Recall (harmonic mean).", formula:"F1 = 2·PPV·TPR / (PPV + TPR) = 2TP / (2TP + FP + FN)", value:`${fmt6(F1)} (${fmtPct2(F1)})`, analysis: bucket01Higher(F1) },
+      { name:"<span class='abbr'>FM</span> — Fowlkes–Mallows index", meaning:"Geometric mean of Precision and Recall.", formula:"FM = √(PPV · TPR)", value:`${fmt6(FM)} (${fmtPct2(FM)})`, analysis: bucket01Higher(FM) },
+      { name:"<span class='abbr'>TS</span> (CSI, Jaccard) — Threat Score / Critical Success Index", meaning:"TP over (TP + FP + FN). Ignores TN.", formula:"TS = TP / (TP + FN + FP)", value:`${fmt6(TS)} (${fmtPct2(TS)})`, analysis: bucket01Higher(TS) },
+
+      { name:"<span class='abbr'>BM</span> (Youden’s J) — Informedness", meaning:"Skill beyond chance using TPR and TNR (−1..+1).", formula:"BM = TPR + TNR − 1", value: fmt6(BM), analysis: bucketSigned(BM) },
+      { name:"<span class='abbr'>MK</span> — Markedness", meaning:"Skill beyond chance using PPV and NPV (−1..+1).", formula:"MK = PPV + NPV − 1", value: fmt6(MK), analysis: bucketSigned(MK) },
+
+      { name:"<span class='abbr'>LR+</span> — Positive Likelihood Ratio", meaning:"How much a positive prediction increases odds.", formula:"LR+ = TPR / FPR", value: fmt6(LRp), analysis: bucketLRp(LRp) },
+      { name:"<span class='abbr'>LR−</span> — Negative Likelihood Ratio", meaning:"How much a negative prediction decreases odds.", formula:"LR− = FNR / TNR", value: fmt6(LRm), analysis: bucketLRm(LRm) },
+      { name:"<span class='abbr'>DOR</span> — Diagnostic Odds Ratio", meaning:"Overall diagnostic discrimination.", formula:"DOR = LR+ / LR−", value: fmt6(DOR), analysis: bucketDOR(DOR) },
+
+      { name:"<span class='abbr'>MCC</span> — Matthews Correlation Coefficient", meaning:"Correlation between prediction and truth (−1..+1).", formula:"MCC = (TP·TN − FP·FN) / √((TP+FP)(TP+FN)(TN+FP)(TN+FN))", value: fmt6(MCC), analysis: bucketSigned(MCC) },
+
+      { name:"<span class='abbr'>PT</span> — Prevalence Threshold", meaning:"Theoretical prevalence threshold.", formula:"PT = (√(TPR·FPR) − FPR) / (TPR − FPR)", value: fmt6(PT),
+        analysis: (Number.isFinite(PT) && Number.isFinite(prevalence))
+          ? (prevalence >= PT ? "<b>Prevalence ≥ PT</b> · <span class='opt'>favorable</span>" : "<b>Prevalence < PT</b> · <span class='opt'>unfavorable</span>")
+          : "<span class='opt'>N/A</span>"
+      },
+    ];
+
+    el('metricsList').innerHTML = metrics.map(metricCard).join("");
+  }
+
+  function scheduleCompute(){
+    if(resizeRAF) cancelAnimationFrame(resizeRAF);
+    resizeRAF = requestAnimationFrame(compute);
+  }
+
+  Object.values(inputs).forEach(inp=>{
+    inp.addEventListener('input', compute);
+    inp.addEventListener('change', compute);
+  });
+  window.addEventListener('resize', scheduleCompute);
+
+  compute();
+})();
+</script>
+</body>
+</html>
